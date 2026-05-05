@@ -39,7 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.only(right: 16.0),
               child: GestureDetector(
                 onTap: () {
-                  // TODO: Navigate to Profile or Auth
+                  // Navigate to Profile or Auth
                 },
                 child: const CircleAvatar(
                   radius: 18,
