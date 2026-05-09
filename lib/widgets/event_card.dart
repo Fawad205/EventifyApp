@@ -39,13 +39,17 @@ class EventCard extends StatelessWidget {
                   height: 160,
                   width: double.infinity,
                   color: Colors.grey[200],
-                  child: Image.network(
-                    event.imageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Center(child: Icon(Icons.image_not_supported, color: Colors.grey));
-                    },
-                  ),
+                  child: event.imageUrl.isEmpty 
+                    ? const Center(
+                        child: Icon(Icons.event, size: 50, color: Colors.grey),
+                      )
+                    : Image.network(
+                        event.imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Center(child: Icon(Icons.image_not_supported, color: Colors.grey));
+                        },
+                      ),
                 ),
               ),
               // Content

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/event_model.dart';
+import '../widgets/event_card.dart';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -9,6 +11,21 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final Color primaryPurple = const Color(0xFF6342E8);
+
+  Widget _buildEventList(List<Event> events) {
+    if (events.isEmpty) {
+      return const Center(
+        child: Text('No events found in this category.', style: TextStyle(color: Colors.black54)),
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: events.length,
+      itemBuilder: (context, index) {
+        return EventCard(event: events[index]);
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,19 +88,36 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
-        body: const TabBarView(
-          children: [
-            // All Events Tab
-            Center(child: Text('All Events Content', style: TextStyle(fontSize: 18))),
-            // Nearby Tab
-            Center(child: Text('Nearby Events Content', style: TextStyle(fontSize: 18))),
-            // Tech Events Tab
-            Center(child: Text('Tech Events Content', style: TextStyle(fontSize: 18))),
-            // Islamic Events Tab
-            Center(child: Text('Islamic Events Content', style: TextStyle(fontSize: 18))),
-            // Expo Events Tab
-            Center(child: Text('Expo Events Content', style: TextStyle(fontSize: 18))),
-          ],
+        body: StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance.collection('events').snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return const Center(child: Text('Something went wrong.'));
+            }
+
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Center(child: CircularProgressIndicator(color: primaryPurple));
+            }
+
+            final List<Event> events = snapshot.data!.docs
+                .map((doc) => Event.fromFirestore(doc))
+                .toList();
+
+            return TabBarView(
+              children: [
+                // All Events Tab
+                _buildEventList(events),
+                // Nearby Tab (showing all for now)
+                _buildEventList(events),
+                // Tech Events Tab
+                _buildEventList(events.where((e) => e.category == 'Tech Events').toList()),
+                // Islamic Events Tab
+                _buildEventList(events.where((e) => e.category == 'Islamic Events').toList()),
+                // Expo Events Tab
+                _buildEventList(events.where((e) => e.category == 'Expo Events').toList()),
+              ],
+            );
+          },
         ),
       ),
     );
