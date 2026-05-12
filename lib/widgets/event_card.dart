@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/event_model.dart';
 import 'package:intl/intl.dart';
+import '../services/auth_service.dart';
+import '../screens/auth/login_screen.dart';
+import '../screens/event_detail_screen.dart';
 
 class EventCard extends StatelessWidget {
   final Event event;
@@ -27,7 +30,22 @@ class EventCard extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () {
-            // TODO: Navigate to event details
+            final authService = AuthService();
+            if (authService.currentUser != null) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => EventDetailScreen(event: event),
+                ),
+              );
+            } else {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const LoginScreen(),
+                ),
+              );
+            }
           },
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
