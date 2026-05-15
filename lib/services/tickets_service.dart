@@ -31,4 +31,31 @@ class TicketsService {
         .orderBy('purchasedAt', descending: true)
         .snapshots();
   }
+
+  // Delete a specific ticket
+  Future<void> deleteTicket(String ticketId) async {
+    await _ticketsRef.doc(ticketId).delete();
+  }
+
+  // Remove tickets that are older than 5 hours after the event time
+  Future<void> cleanupExpiredTickets() async {
+    try {
+      final snapshot = await _ticketsRef.get();
+      final now = DateTime.now();
+      
+      for (var doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        if (data['date'] != null) {
+          final eventDate = (data['date'] as Timestamp).toDate();
+          final expiryDate = eventDate.add(const Duration(hours: 5));
+          
+          if (now.isAfter(expiryDate)) {
+            await doc.reference.delete();
+          }
+        }
+      }
+    } catch (e) {
+      // Log error in a production-safe way
+    }
+  }
 }

@@ -6,6 +6,7 @@ import '../services/favorites_service.dart';
 import '../services/tickets_service.dart';
 import '../services/map_service.dart';
 import 'auth/login_screen.dart';
+import 'tickets_screen.dart';
 
 class EventDetailScreen extends StatelessWidget {
   final Event event;
@@ -164,7 +165,7 @@ class EventDetailScreen extends StatelessWidget {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, -5),
             ),
@@ -193,26 +194,10 @@ class EventDetailScreen extends StatelessWidget {
             const SizedBox(width: 24),
             Expanded(
               child: ElevatedButton(
-                onPressed: () async {
+                onPressed: () {
                   final authService = AuthService();
                   if (authService.currentUser != null) {
-                    try {
-                      await TicketsService().addTicket(event.id, event.toMap());
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Event added to My Tickets!'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                      }
-                    } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Failed to add ticket: $e')),
-                        );
-                      }
-                    }
+                    _showConfirmationDialog(context, primaryPurple);
                   } else {
                     Navigator.push(
                       context,
@@ -237,6 +222,67 @@ class EventDetailScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  void _showConfirmationDialog(BuildContext context, Color primaryColor) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.info_outline, color: Color(0xFF6342E8)),
+              SizedBox(width: 10),
+              Text('Confirm Ticket', style: TextStyle(fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: const Text(
+            'Payment will be collected upon arrival at the venue. A digital ticket will be assigned to you, which you can present at the entrance to settle your liabilities and attend the event.',
+            style: TextStyle(height: 1.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext); // Close dialog
+                try {
+                  await TicketsService().addTicket(event.id, event.toMap());
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Event added to My Tickets!'),
+                        backgroundColor: Colors.green,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const TicketsScreen()),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to add ticket: $e')),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Confirm & Get Ticket'),
+            ),
+          ],
+        );
+      },
     );
   }
 
