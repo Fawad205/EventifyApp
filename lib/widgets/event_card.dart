@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../services/auth_service.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/event_detail_screen.dart';
+import '../services/favorites_service.dart';
 
 class EventCard extends StatelessWidget {
   final Event event;
@@ -12,6 +13,9 @@ class EventCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final favoritesService = FavoritesService();
+    final authService = AuthService();
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -30,7 +34,6 @@ class EventCard extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () {
-            final authService = AuthService();
             if (authService.currentUser != null) {
               Navigator.push(
                 context,
@@ -51,24 +54,63 @@ class EventCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Image Banner
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                child: Container(
-                  height: 160,
-                  width: double.infinity,
-                  color: Colors.grey[200],
-                  child: event.imageUrl.isEmpty 
-                    ? const Center(
-                        child: Icon(Icons.event, size: 50, color: Colors.grey),
-                      )
-                    : Image.network(
-                        event.imageUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Center(child: Icon(Icons.image_not_supported, color: Colors.grey));
-                        },
-                      ),
-                ),
+              Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                    child: Container(
+                      height: 160,
+                      width: double.infinity,
+                      color: Colors.grey[200],
+                      child: event.imageUrl.isEmpty 
+                        ? const Center(
+                            child: Icon(Icons.event, size: 50, color: Colors.grey),
+                          )
+                        : Image.network(
+                            event.imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Center(child: Icon(Icons.image_not_supported, color: Colors.grey));
+                            },
+                          ),
+                    ),
+                  ),
+                  // Favorite Button Overlay
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: StreamBuilder<bool>(
+                      stream: favoritesService.isFavorited(event.id),
+                      builder: (context, snapshot) {
+                        final isFav = snapshot.data ?? false;
+                        return GestureDetector(
+                          onTap: () {
+                            if (authService.currentUser != null) {
+                              favoritesService.toggleFavorite(event.id, event.toMap());
+                            } else {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (context) => const LoginScreen()),
+                              );
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.9),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              isFav ? Icons.favorite : Icons.favorite_border,
+                              color: isFav ? Colors.red : Colors.grey,
+                              size: 20,
+                            ),
+                          ),
+                        );
+                      }
+                    ),
+                  ),
+                ],
               ),
               // Content
               Padding(
@@ -88,7 +130,7 @@ class EventCard extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          event.price == 0 ? 'Free' : '\$${event.price.toStringAsFixed(2)}',
+                          event.price == 0 ? 'Free' : 'Rs ${event.price.toStringAsFixed(0)}',
                           style: const TextStyle(
                             color: Colors.black87,
                             fontWeight: FontWeight.bold,

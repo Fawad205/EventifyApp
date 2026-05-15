@@ -349,20 +349,5 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
-  Widget _buildSmallSocialButton({
-    required String iconPath,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade200),
-          shape: BoxShape.circle,
-        ),
-        child: Image.asset(iconPath, width: 24, height: 24),
-      ),
-    );
-  }
+
 }

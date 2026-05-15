@@ -2,7 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'dart:io';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:location/location.dart' as loc;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models/event_model.dart';
 import '../widgets/event_card.dart';
 class AdminScreen extends StatefulWidget {
@@ -19,6 +25,11 @@ class _AdminScreenState extends State<AdminScreen> {
   final _locationController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _priceController = TextEditingController();
+  final _imageUrlController = TextEditingController();
+  File? _selectedImage;
+  final ImagePicker _picker = ImagePicker();
+  final MapController _mapController = MapController();
+  final loc.Location _locationService = loc.Location();
 
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _selectedTime = const TimeOfDay(hour: 18, minute: 0);
@@ -44,7 +55,69 @@ class _AdminScreenState extends State<AdminScreen> {
     _locationController.dispose();
     _descriptionController.dispose();
     _priceController.dispose();
+    _imageUrlController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+    if (pickedFile != null) {
+      setState(() {
+        _selectedImage = File(pickedFile.path);
+        _imageUrlController.text = pickedFile.name;
+      });
+    }
+  }
+
+  Future<void> _getCurrentLocation() async {
+    bool serviceEnabled;
+    loc.PermissionStatus permissionGranted;
+
+    serviceEnabled = await _locationService.serviceEnabled();
+    if (!serviceEnabled) {
+      serviceEnabled = await _locationService.requestService();
+      if (!serviceEnabled) return;
+    }
+
+    permissionGranted = await _locationService.hasPermission();
+    if (permissionGranted == loc.PermissionStatus.denied) {
+      permissionGranted = await _locationService.requestPermission();
+      if (permissionGranted != loc.PermissionStatus.granted) return;
+    }
+
+    final locationData = await _locationService.getLocation();
+    if (locationData.latitude != null && locationData.longitude != null) {
+      final point = LatLng(locationData.latitude!, locationData.longitude!);
+      _mapController.move(point, 15.0);
+      _updateLocation(point);
+    }
+  }
+
+  Future<void> _updateLocation(LatLng point) async {
+    setState(() {
+      _selectedLocation = point;
+      _locationController.text = "Loading address...";
+    });
+
+    try {
+      final response = await http.get(Uri.parse(
+          'https://nominatim.openstreetmap.org/reverse?format=json&lat=${point.latitude}&lon=${point.longitude}&zoom=18&addressdetails=1'));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final address = data['display_name'] ?? "${point.latitude}, ${point.longitude}";
+        setState(() {
+          _locationController.text = address;
+        });
+      } else {
+        setState(() {
+          _locationController.text = "${point.latitude.toStringAsFixed(4)}, ${point.longitude.toStringAsFixed(4)}";
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _locationController.text = "${point.latitude.toStringAsFixed(4)}, ${point.longitude.toStringAsFixed(4)}";
+      });
+    }
   }
 
   Future<void> _pickDate() async {
@@ -87,18 +160,45 @@ class _AdminScreenState extends State<AdminScreen> {
 
       final double price = double.tryParse(_priceController.text) ?? 0.0;
 
-      final newEvent = Event(
-        id: '', // Firestore auto-generates ID
-        title: _nameController.text.isEmpty ? 'Untitled Event' : _nameController.text,
-        description: _descriptionController.text,
-        category: _selectedCategory,
-        date: eventDateTime,
-        location: _locationController.text.isEmpty ? 'TBD' : _locationController.text,
-        imageUrl: '', // Blank image for real data
-        price: price,
-      );
-
       try {
+        String finalImageUrl = _imageUrlController.text.trim();
+        
+        // Try to upload if an image was picked from gallery
+        if (_selectedImage != null) {
+          final String fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+          
+          // Try default bucket first
+          try {
+            final Reference storageRef = FirebaseStorage.instance.ref().child('events_images/$fileName');
+            final UploadTask uploadTask = storageRef.putFile(_selectedImage!);
+            final TaskSnapshot snapshot = await uploadTask;
+            finalImageUrl = await snapshot.ref.getDownloadURL();
+          } catch (storageError) {
+            // If default fails, try the explicit .appspot.com bucket which is usually free
+            final Reference altRef = FirebaseStorage.instanceFor(bucket: "event-app-928aa.appspot.com")
+                .ref().child('events_images/$fileName');
+            final UploadTask altTask = altRef.putFile(_selectedImage!);
+            final TaskSnapshot altSnapshot = await altTask;
+            finalImageUrl = await altSnapshot.ref.getDownloadURL();
+          }
+        } else if (finalImageUrl.isEmpty) {
+          // Fallback if no gallery image AND no URL provided
+          finalImageUrl = 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=800&q=80';
+        }
+
+        final newEvent = Event(
+          id: '', 
+          title: _nameController.text.isEmpty ? 'Untitled Event' : _nameController.text,
+          description: _descriptionController.text,
+          category: _selectedCategory,
+          date: eventDateTime,
+          location: _locationController.text.isEmpty ? 'TBD' : _locationController.text,
+          imageUrl: finalImageUrl, 
+          price: price,
+          latitude: _selectedLocation?.latitude,
+          longitude: _selectedLocation?.longitude,
+        );
+
         await FirebaseFirestore.instance.collection('events').add(newEvent.toMap());
         
         if (mounted) {
@@ -142,6 +242,80 @@ class _AdminScreenState extends State<AdminScreen> {
               const Text('Create New Event', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 24),
               
+              // Combined Image Picker & URL Field
+              _buildTextField(
+                label: 'Image URL or Gallery',
+                hint: 'Paste a link or tap the icon below to upload',
+                controller: _imageUrlController,
+                onChanged: (value) {
+                  setState(() {
+                    _selectedImage = null; // Clear gallery selection if user types a URL
+                  }); 
+                },
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _pickImage,
+                      icon: const Icon(Icons.photo_library),
+                      label: const Text('Pick from Gallery'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey.shade100,
+                        foregroundColor: Colors.black87,
+                        elevation: 0,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _selectedImage = null;
+                          _imageUrlController.text = 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=800&q=80';
+                        });
+                      },
+                      icon: const Icon(Icons.image_search, size: 18),
+                      label: const Text('Use Sample', style: TextStyle(fontSize: 12)),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              
+              if (_selectedImage != null || _imageUrlController.text.isNotEmpty)
+                Container(
+                  height: 150,
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: _selectedImage != null 
+                      ? Image.file(_selectedImage!, fit: BoxFit.cover)
+                      : Image.network(
+                          _imageUrlController.text.trim(),
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: const [
+                                  Icon(Icons.broken_image, color: Colors.red, size: 40),
+                                  Text('Invalid image link', style: TextStyle(color: Colors.red, fontSize: 12)),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                  ),
+                ),
+              
               // Event Name
               _buildTextField(
                 label: 'Event Name',
@@ -180,7 +354,7 @@ class _AdminScreenState extends State<AdminScreen> {
               // Category
               DropdownButtonFormField<String>(
                 decoration: _inputDecoration('Category'),
-                value: _selectedCategory,
+                initialValue: _selectedCategory,
                 items: _categories.map((String category) {
                   return DropdownMenuItem<String>(
                     value: category,
@@ -201,40 +375,49 @@ class _AdminScreenState extends State<AdminScreen> {
               const Text('Pin Location on Map', style: TextStyle(fontSize: 14, color: Colors.black87)),
               const SizedBox(height: 8),
               Container(
-                height: 200,
+                height: 250,
                 decoration: BoxDecoration(
                   border: Border.all(color: Colors.grey.shade300),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: FlutterMap(
-                    options: MapOptions(
-                      initialCenter: const LatLng(31.4187, 73.0791), // Faisalabad approx
-                      initialZoom: 13.0,
-                      onTap: (tapPosition, point) {
-                        setState(() {
-                          _selectedLocation = point;
-                          _locationController.text = "${point.latitude.toStringAsFixed(4)}, ${point.longitude.toStringAsFixed(4)}";
-                        });
-                      },
-                    ),
+                  child: Stack(
                     children: [
-                      TileLayer(
-                        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.example.eventify',
-                      ),
-                      if (_selectedLocation != null)
-                        MarkerLayer(
-                          markers: [
-                            Marker(
-                              point: _selectedLocation!,
-                              width: 40,
-                              height: 40,
-                              child: const Icon(Icons.location_on, color: Colors.red, size: 40),
-                            ),
-                          ],
+                      FlutterMap(
+                        mapController: _mapController,
+                        options: MapOptions(
+                          initialCenter: const LatLng(31.4187, 73.0791),
+                          initialZoom: 13.0,
+                          onTap: (tapPosition, point) => _updateLocation(point),
                         ),
+                        children: [
+                          TileLayer(
+                            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            userAgentPackageName: 'com.example.eventify',
+                          ),
+                          if (_selectedLocation != null)
+                            MarkerLayer(
+                              markers: [
+                                Marker(
+                                  point: _selectedLocation!,
+                                  width: 40,
+                                  height: 40,
+                                  child: const Icon(Icons.location_on, color: Colors.red, size: 40),
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                      Positioned(
+                        right: 16,
+                        bottom: 16,
+                        child: FloatingActionButton.small(
+                          onPressed: _getCurrentLocation,
+                          backgroundColor: primaryPurple,
+                          child: const Icon(Icons.my_location, color: Colors.white),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -262,7 +445,7 @@ class _AdminScreenState extends State<AdminScreen> {
               // Price
               _buildTextField(
                 label: 'Ticket Price (PKR)',
-                hint: '2500',
+                hint: 'e.g. 2500',
                 controller: _priceController,
                 keyboardType: TextInputType.number,
               ),
@@ -310,6 +493,7 @@ class _AdminScreenState extends State<AdminScreen> {
     int maxLines = 1,
     TextInputType? keyboardType,
     String? Function(String?)? validator,
+    void Function(String)? onChanged,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -321,6 +505,7 @@ class _AdminScreenState extends State<AdminScreen> {
           maxLines: maxLines,
           keyboardType: keyboardType,
           validator: validator,
+          onChanged: onChanged,
           decoration: _inputDecoration(hint),
         ),
       ],

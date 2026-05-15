@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../models/event_model.dart';
 import 'package:intl/intl.dart';
 import '../services/auth_service.dart';
+import '../services/favorites_service.dart';
+import '../services/tickets_service.dart';
+import '../services/map_service.dart';
 import 'auth/login_screen.dart';
 
 class EventDetailScreen extends StatelessWidget {
@@ -29,17 +32,54 @@ class EventDetailScreen extends StatelessWidget {
                   ),
                   child: event.imageUrl.isEmpty
                       ? const Icon(Icons.event, size: 100, color: Colors.grey)
-                      : Image.network(event.imageUrl, fit: BoxFit.cover),
+                      : Image.network(
+                          event.imageUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Center(child: Icon(Icons.broken_image, size: 50, color: Colors.grey));
+                          },
+                        ),
                 ),
                 SafeArea(
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
-                    child: CircleAvatar(
-                      backgroundColor: Colors.white,
-                      child: IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.black),
-                        onPressed: () => Navigator.pop(context),
-                      ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        CircleAvatar(
+                          backgroundColor: Colors.white,
+                          child: IconButton(
+                            icon: const Icon(Icons.arrow_back, color: Colors.black),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ),
+                        StreamBuilder<bool>(
+                          stream: FavoritesService().isFavorited(event.id),
+                          builder: (context, snapshot) {
+                            final isFav = snapshot.data ?? false;
+                            return CircleAvatar(
+                              backgroundColor: Colors.white,
+                              child: IconButton(
+                                icon: Icon(
+                                  isFav ? Icons.favorite : Icons.favorite_border,
+                                  color: isFav ? Colors.red : Colors.black,
+                                ),
+                                onPressed: () {
+                                  final authService = AuthService();
+                                  if (authService.currentUser != null) {
+                                    FavoritesService().toggleFavorite(event.id, event.toMap());
+                                  } else {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (context) => const LoginScreen()),
+                                    );
+                                  }
+                                },
+                              ),
+                            );
+                          }
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -77,10 +117,21 @@ class EventDetailScreen extends StatelessWidget {
                     DateFormat('hh:mm a').format(event.date),
                   ),
                   const SizedBox(height: 16),
-                  _buildInfoRow(
-                    Icons.location_on,
-                    event.location,
-                    'View on map',
+                  InkWell(
+                    onTap: () {
+                      if (event.latitude != null && event.longitude != null) {
+                        MapService.openMap(event.latitude!, event.longitude!);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Precise location not available for this event.')),
+                        );
+                      }
+                    },
+                    child: _buildInfoRow(
+                      Icons.location_on,
+                      event.location,
+                      event.latitude != null ? 'Tap to Navigate' : 'Address only',
+                    ),
                   ),
                   
                   const SizedBox(height: 32),
@@ -130,7 +181,7 @@ class EventDetailScreen extends StatelessWidget {
                   style: TextStyle(color: Colors.black54, fontSize: 12),
                 ),
                 Text(
-                  event.price == 0 ? 'Free' : '\$${event.price.toStringAsFixed(2)}',
+                  event.price == 0 ? 'Free' : 'Rs ${event.price.toStringAsFixed(0)}',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -142,13 +193,26 @@ class EventDetailScreen extends StatelessWidget {
             const SizedBox(width: 24),
             Expanded(
               child: ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   final authService = AuthService();
                   if (authService.currentUser != null) {
-                    // TODO: Implement buying logic
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Processing your ticket...')),
-                    );
+                    try {
+                      await TicketsService().addTicket(event.id, event.toMap());
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Event added to My Tickets!'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Failed to add ticket: $e')),
+                        );
+                      }
+                    }
                   } else {
                     Navigator.push(
                       context,
