@@ -113,6 +113,7 @@ class EventDetailScreen extends StatelessWidget {
                   
                   // Info Row
                   _buildInfoRow(
+                    context,
                     Icons.calendar_today,
                     DateFormat('EEEE, MMM dd, yyyy').format(event.date),
                     DateFormat('hh:mm a').format(event.date),
@@ -129,6 +130,7 @@ class EventDetailScreen extends StatelessWidget {
                       }
                     },
                     child: _buildInfoRow(
+                      context,
                       Icons.location_on,
                       event.location,
                       event.latitude != null ? 'Tap to Navigate' : 'Address only',
@@ -136,22 +138,23 @@ class EventDetailScreen extends StatelessWidget {
                   ),
                   
                   const SizedBox(height: 32),
-                  const Text(
+                  Text(
                     'About Event',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Text(
-                    event.description,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      color: Colors.black54,
-                      height: 1.5,
+                    Text(
+                      event.description,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        height: 1.5,
+                      ),
                     ),
-                  ),
                   const SizedBox(height: 100), // Space for bottom button
                 ],
               ),
@@ -162,7 +165,7 @@ class EventDetailScreen extends StatelessWidget {
       bottomSheet: Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.05),
@@ -193,30 +196,46 @@ class EventDetailScreen extends StatelessWidget {
             ),
             const SizedBox(width: 24),
             Expanded(
-              child: ElevatedButton(
-                onPressed: () {
-                  final authService = AuthService();
-                  if (authService.currentUser != null) {
-                    _showConfirmationDialog(context, primaryPurple);
-                  } else {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const LoginScreen()),
-                    );
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryPurple,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size.fromHeight(56),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                child: const Text(
-                  'Buy Ticket',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
+              child: StreamBuilder<bool>(
+                stream: TicketsService().hasTicketStream(event.id),
+                builder: (context, snapshot) {
+                  final hasTicket = snapshot.data ?? false;
+                  
+                  return ElevatedButton(
+                    onPressed: hasTicket 
+                      ? () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('You have already purchased this ticket!'),
+                              backgroundColor: Colors.orange,
+                            ),
+                          );
+                        }
+                      : () {
+                          final authService = AuthService();
+                          if (authService.currentUser != null) {
+                            _showConfirmationDialog(context, primaryPurple);
+                          } else {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const LoginScreen()),
+                            );
+                          }
+                        },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: hasTicket ? Colors.grey : primaryPurple,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(56),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: Text(
+                      hasTicket ? 'Already Buy' : 'Buy Ticket',
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  );
+                }
               ),
             ),
           ],
@@ -286,7 +305,7 @@ class EventDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String title, String subtitle) {
+  Widget _buildInfoRow(BuildContext context, IconData icon, String title, String subtitle) {
     return Row(
       children: [
         Container(
@@ -310,8 +329,8 @@ class EventDetailScreen extends StatelessWidget {
             ),
             Text(
               subtitle,
-              style: const TextStyle(
-                color: Colors.black54,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontSize: 12,
               ),
             ),

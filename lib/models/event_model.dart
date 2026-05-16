@@ -11,6 +11,7 @@ class Event {
   final double price;
   final double? latitude;
   final double? longitude;
+  final String createdBy;
 
   Event({
     required this.id,
@@ -23,6 +24,7 @@ class Event {
     required this.price,
     this.latitude,
     this.longitude,
+    required this.createdBy,
   });
 
   factory Event.fromFirestore(DocumentSnapshot doc) {
@@ -42,6 +44,7 @@ class Event {
       price: (data['price'] ?? 0).toDouble(),
       latitude: (data['latitude'] as num?)?.toDouble(),
       longitude: (data['longitude'] as num?)?.toDouble(),
+      createdBy: data['createdBy'] ?? '',
     );
   }
 
@@ -56,6 +59,7 @@ class Event {
     double? price,
     double? latitude,
     double? longitude,
+    String? createdBy,
   }) {
     return Event(
       id: id ?? this.id,
@@ -68,6 +72,7 @@ class Event {
       price: price ?? this.price,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
+      createdBy: createdBy ?? this.createdBy,
     );
   }
 
@@ -82,6 +87,7 @@ class Event {
       'price': price,
       'latitude': latitude,
       'longitude': longitude,
+      'createdBy': createdBy,
     };
   }
 }

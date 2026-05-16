@@ -1,8 +1,11 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'admin_screen.dart';
+import 'tickets_screen.dart';
 import '../services/auth_service.dart';
+import '../services/tickets_service.dart';
 import 'auth/login_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -13,12 +16,26 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final _authService = AuthService();
+  final _ticketsService = TicketsService();
+
+  @override
+  void initState() {
+    super.initState();
+    _cleanupTickets();
+  }
+
+  Future<void> _cleanupTickets() async {
+    final user = _authService.currentUser;
+    if (user != null) {
+      await _ticketsService.cleanupExpiredTickets();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    const Color primaryPurple = Color(0xFF6342E8);
-    const Color lightPurple = Color(0xFFF3F0FF);
-    const Color bgColor = Color(0xFFF8F9FA);
+    final Color primaryPurple = Theme.of(context).primaryColor;
+    final Color lightPurple = Theme.of(context).colorScheme.primaryContainer;
+    final Color bgColor = Theme.of(context).scaffoldBackgroundColor;
 
     // Read live user data from Firebase Auth
     return StreamBuilder<User?>(
@@ -78,10 +95,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 // Name
                 Text(
                   isLoggedIn ? userName : 'Guest User',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 if (isLoggedIn && userEmail.isNotEmpty) ...[
@@ -110,8 +127,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       const SizedBox(width: 16),
                       Expanded(
-                        child: _buildStatCard(
-                            'Active Tickets', '0', primaryPurple),
+                        child: StreamBuilder<QuerySnapshot>(
+                          stream: _ticketsService.getTickets(),
+                          builder: (context, ticketSnapshot) {
+                            final count = ticketSnapshot.data?.docs.length ?? 0;
+                            return _buildStatCard(
+                              'Active Tickets', 
+                              count.toString(), 
+                              primaryPurple
+                            );
+                          }
+                        ),
                       ),
                     ],
                   ),
@@ -121,15 +147,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     icon: Icons.confirmation_number_outlined,
                     lightPurple: lightPurple,
                     primaryPurple: primaryPurple,
-                    onTap: () {},
-                  ),
-                  const SizedBox(height: 16),
-                  _buildActionItem(
-                    title: 'Edit Profile',
-                    icon: Icons.person_outline,
-                    lightPurple: lightPurple,
-                    primaryPurple: primaryPurple,
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const TicketsScreen()),
+                      );
+                    },
                   ),
                   const SizedBox(height: 16),
                   _buildActionItem(
@@ -223,7 +246,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -259,7 +282,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
@@ -276,10 +299,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: Colors.black87),
+                    color: Theme.of(context).colorScheme.onSurface),
               ),
             ),
             const Icon(Icons.arrow_forward_ios,

@@ -20,6 +20,19 @@ class TicketsService {
     });
   }
 
+  // Check if user already has a ticket for this event
+  Stream<bool> hasTicketStream(String eventId) {
+    final user = _auth.currentUser;
+    if (user == null) return Stream.value(false);
+    return _firestore
+        .collection('users')
+        .doc(user.uid)
+        .collection('tickets')
+        .doc(eventId)
+        .snapshots()
+        .map((doc) => doc.exists);
+  }
+
   // Get all tickets for the current user
   Stream<QuerySnapshot> getTickets() {
     final user = _auth.currentUser;

@@ -19,7 +19,7 @@ class EventCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -131,8 +131,8 @@ class EventCard extends StatelessWidget {
                         ),
                         Text(
                           event.price == 0 ? 'Free' : 'Rs ${event.price.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            color: Colors.black87,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
                           ),
@@ -142,10 +142,10 @@ class EventCard extends StatelessWidget {
                     const SizedBox(height: 8),
                     Text(
                       event.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -153,23 +153,23 @@ class EventCard extends StatelessWidget {
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        const Icon(Icons.calendar_today, size: 14, color: Colors.black54),
+                        const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
                         const SizedBox(width: 6),
                         Text(
                           DateFormat('MMM dd, yyyy - hh:mm a').format(event.date),
-                          style: const TextStyle(fontSize: 12, color: Colors.black54),
+                          style: const TextStyle(fontSize: 12, color: Colors.grey),
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        const Icon(Icons.location_on, size: 14, color: Colors.black54),
+                        const Icon(Icons.location_on, size: 14, color: Colors.grey),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
                             event.location,
-                            style: const TextStyle(fontSize: 12, color: Colors.black54),
+                            style: const TextStyle(fontSize: 12, color: Colors.grey),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),

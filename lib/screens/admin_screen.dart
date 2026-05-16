@@ -9,6 +9,7 @@ import 'package:location/location.dart' as loc;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/event_model.dart';
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -29,6 +30,7 @@ class _AdminScreenState extends State<AdminScreen> {
   final ImagePicker _picker = ImagePicker();
   final MapController _mapController = MapController();
   final loc.Location _locationService = loc.Location();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _selectedTime = const TimeOfDay(hour: 18, minute: 0);
@@ -196,6 +198,7 @@ class _AdminScreenState extends State<AdminScreen> {
           price: price,
           latitude: _selectedLocation?.latitude,
           longitude: _selectedLocation?.longitude,
+          createdBy: _auth.currentUser?.uid ?? '',
         );
 
         await FirebaseFirestore.instance.collection('events').add(newEvent.toMap());
@@ -516,8 +519,15 @@ class _AdminScreenState extends State<AdminScreen> {
 
   Widget _buildManageEventsTab(Color primaryPurple) {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('events').orderBy('date', descending: true).snapshots(),
+      stream: FirebaseFirestore.instance
+          .collection('events')
+          .where('createdBy', isEqualTo: _auth.currentUser?.uid)
+          .snapshots(),
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
