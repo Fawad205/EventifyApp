@@ -163,15 +163,32 @@ class EventCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Icon(Icons.location_on, size: 14, color: Colors.grey),
                         const SizedBox(width: 6),
                         Expanded(
-                          child: Text(
-                            event.location,
-                            style: const TextStyle(fontSize: 12, color: Colors.grey),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                event.venueName.isEmpty ? event.location : event.venueName,
+                                style: TextStyle(
+                                  fontSize: 12, 
+                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              if (event.venueName.isNotEmpty)
+                                Text(
+                                  event.location,
+                                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                            ],
                           ),
                         ),
                       ],

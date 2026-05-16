@@ -138,9 +138,9 @@ class DigitalTicketScreen extends StatelessWidget {
                                 const SizedBox(width: 4),
                                 Expanded(
                                   child: Text(
-                                    event.location,
-                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                                    maxLines: 1,
+                                    event.venueName.isEmpty ? event.location : "${event.venueName}\n${event.location}",
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                                    maxLines: 3,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),

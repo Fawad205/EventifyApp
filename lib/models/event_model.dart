@@ -7,6 +7,7 @@ class Event {
   final String category;
   final DateTime date;
   final String location;
+  final String venueName;
   final String imageUrl;
   final double price;
   final double? latitude;
@@ -20,6 +21,7 @@ class Event {
     required this.category,
     required this.date,
     required this.location,
+    required this.venueName,
     required this.imageUrl,
     required this.price,
     this.latitude,
@@ -34,12 +36,13 @@ class Event {
 
   factory Event.fromMap(Map<String, dynamic> data) {
     return Event(
-      id: '', // Temporary or passed via copyWith
+      id: '', 
       title: data['title'] ?? '',
       description: data['description'] ?? '',
       category: data['category'] ?? '',
       date: (data['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
       location: data['location'] ?? '',
+      venueName: data['venueName'] ?? '',
       imageUrl: data['imageUrl'] ?? '',
       price: (data['price'] ?? 0).toDouble(),
       latitude: (data['latitude'] as num?)?.toDouble(),
@@ -55,6 +58,7 @@ class Event {
     String? category,
     DateTime? date,
     String? location,
+    String? venueName,
     String? imageUrl,
     double? price,
     double? latitude,
@@ -68,6 +72,7 @@ class Event {
       category: category ?? this.category,
       date: date ?? this.date,
       location: location ?? this.location,
+      venueName: venueName ?? this.venueName,
       imageUrl: imageUrl ?? this.imageUrl,
       price: price ?? this.price,
       latitude: latitude ?? this.latitude,
@@ -83,6 +88,7 @@ class Event {
       'category': category,
       'date': Timestamp.fromDate(date),
       'location': location,
+      'venueName': venueName,
       'imageUrl': imageUrl,
       'price': price,
       'latitude': latitude,

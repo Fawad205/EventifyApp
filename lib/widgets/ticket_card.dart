@@ -109,14 +109,15 @@ class TicketCard extends StatelessWidget {
                               ),
                               const SizedBox(height: 4),
                               Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const Icon(Icons.location_on_outlined, size: 12, color: primaryPurple),
                                   const SizedBox(width: 4),
                                   Expanded(
                                     child: Text(
-                                      event.location,
-                                      style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-                                      maxLines: 1,
+                                      event.venueName.isEmpty ? event.location : "${event.venueName}\n${event.location}",
+                                      style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+                                      maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),

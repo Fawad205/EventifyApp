@@ -23,6 +23,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
 
   final _nameController = TextEditingController();
   final _locationController = TextEditingController();
+  final _venueNameController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _priceController = TextEditingController();
   final _imageUrlController = TextEditingController();
@@ -57,6 +58,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     _tabController.dispose();
     _nameController.dispose();
     _locationController.dispose();
+    _venueNameController.dispose();
     _descriptionController.dispose();
     _priceController.dispose();
     _imageUrlController.dispose();
@@ -196,7 +198,8 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
           description: _descriptionController.text,
           category: _selectedCategory,
           date: eventDateTime,
-          location: _locationController.text.isEmpty ? 'TBD' : _locationController.text,
+          location: _locationController.text,
+          venueName: _venueNameController.text.isEmpty ? 'Venue TBD' : _venueNameController.text,
           imageUrl: finalImageUrl, 
           price: price,
           latitude: _selectedLocation?.latitude,
@@ -238,6 +241,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       _editingEventId = null;
       _nameController.clear();
       _locationController.clear();
+      _venueNameController.clear();
       _descriptionController.clear();
       _priceController.clear();
       _imageUrlController.clear();
@@ -254,6 +258,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       _editingEventId = event.id;
       _nameController.text = event.title;
       _locationController.text = event.location;
+      _venueNameController.text = event.venueName;
       _descriptionController.text = event.description;
       _priceController.text = event.price.toStringAsFixed(0);
       _imageUrlController.text = event.imageUrl;
@@ -507,12 +512,21 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                     ),
                     const SizedBox(height: 16),
     
-                    // Location Name / Coords
+                    // Venue Name (Manual)
                     _buildTextField(
-                      label: 'Location Details',
-                      hint: 'Tap on map or type address...',
+                      label: 'Venue / Building Name (Manual)',
+                      hint: 'e.g. Grand Hall, Marriott Hotel',
+                      controller: _venueNameController,
+                    ),
+                    const SizedBox(height: 16),
+    
+                    // Map Address (Auto-filled)
+                    _buildTextField(
+                      label: 'Exact Map Address (Auto-filled)',
+                      hint: 'Tap on map to pin address...',
                       controller: _locationController,
-                      validator: (value) => value == null || value.isEmpty ? 'Please enter location' : null,
+                      maxLines: 3, // Allow wrapping
+                      validator: (value) => value == null || value.isEmpty ? 'Please select a location on the map' : null,
                     ),
                     const SizedBox(height: 16),
     

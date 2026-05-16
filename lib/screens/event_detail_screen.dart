@@ -132,8 +132,8 @@ class EventDetailScreen extends StatelessWidget {
                     child: _buildInfoRow(
                       context,
                       Icons.location_on,
-                      event.location,
-                      event.latitude != null ? 'Tap to Navigate' : 'Address only',
+                      event.venueName.isEmpty ? 'Venue TBD' : event.venueName,
+                      event.location.isEmpty ? 'Address not pinned' : event.location,
                     ),
                   ),
                   
@@ -317,24 +317,30 @@ class EventDetailScreen extends StatelessWidget {
           child: Icon(icon, color: const Color(0xFF6342E8), size: 20),
         ),
         const SizedBox(width: 16),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-            Text(
-              subtitle,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                fontSize: 12,
+              Text(
+                subtitle,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 12,
+                ),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );
