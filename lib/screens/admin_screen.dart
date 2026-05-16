@@ -270,12 +270,9 @@ class _AdminScreenState extends State<AdminScreen> {
                       },
                     ),
                     const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
+                    Row(
                       children: [
-                        SizedBox(
-                          width: (MediaQuery.of(context).size.width - 60) / 2, // Approximate half width with padding
+                        Expanded(
                           child: ElevatedButton.icon(
                             onPressed: _pickImage,
                             icon: const Icon(Icons.photo_library),
@@ -288,8 +285,8 @@ class _AdminScreenState extends State<AdminScreen> {
                             ),
                           ),
                         ),
-                        SizedBox(
-                          width: (MediaQuery.of(context).size.width - 60) / 2,
+                        const SizedBox(width: 12),
+                        Expanded(
                           child: TextButton.icon(
                             onPressed: () {
                               setState(() {
@@ -347,7 +344,7 @@ class _AdminScreenState extends State<AdminScreen> {
                       validator: (value) => value == null || value.isEmpty ? 'Please enter event name' : null,
                     ),
                     const SizedBox(height: 16),
-
+    
                     // Date & Time Row
                     Row(
                       children: [
@@ -373,7 +370,7 @@ class _AdminScreenState extends State<AdminScreen> {
                       ],
                     ),
                     const SizedBox(height: 16),
-
+    
                     // Category
                     DropdownButtonFormField<String>(
                       decoration: _inputDecoration('Category'),
@@ -393,7 +390,7 @@ class _AdminScreenState extends State<AdminScreen> {
                       },
                     ),
                     const SizedBox(height: 16),
-
+    
                     // Location Map
                     const Text('Pin Location on Map', style: TextStyle(fontSize: 14, color: Colors.black87)),
                     const SizedBox(height: 8),
@@ -446,18 +443,16 @@ class _AdminScreenState extends State<AdminScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-
+    
                     // Location Name / Coords
                     _buildTextField(
                       label: 'Location Details',
                       hint: 'Tap on map or type address...',
                       controller: _locationController,
-                      maxLines: 3,
-                      minLines: 1,
                       validator: (value) => value == null || value.isEmpty ? 'Please enter location' : null,
                     ),
                     const SizedBox(height: 16),
-
+    
                     // Description
                     _buildTextField(
                       label: 'Description',
@@ -466,7 +461,7 @@ class _AdminScreenState extends State<AdminScreen> {
                       maxLines: 4,
                     ),
                     const SizedBox(height: 16),
-
+    
                     // Price
                     _buildTextField(
                       label: 'Ticket Price (PKR)',
@@ -475,7 +470,7 @@ class _AdminScreenState extends State<AdminScreen> {
                       keyboardType: TextInputType.number,
                     ),
                     const SizedBox(height: 32),
-
+    
                     // Submit Button
                     SizedBox(
                       width: double.infinity,
@@ -490,16 +485,13 @@ class _AdminScreenState extends State<AdminScreen> {
                         ),
                         child: _isSaving 
                           ? const CircularProgressIndicator(color: Colors.white)
-                          : const FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text('Create Event', style: TextStyle(fontSize: 16, color: Colors.white)),
-                                  SizedBox(width: 8),
-                                  Icon(Icons.arrow_forward, color: Colors.white),
-                                ],
-                              ),
+                          : const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text('Create Event', style: TextStyle(fontSize: 16, color: Colors.white)),
+                                SizedBox(width: 8),
+                                Icon(Icons.arrow_forward, color: Colors.white),
+                              ],
                             ),
                       ),
                     ),
@@ -640,8 +632,7 @@ class _AdminScreenState extends State<AdminScreen> {
     required String label,
     required String hint,
     required TextEditingController controller,
-    int? maxLines = 1,
-    int? minLines,
+    int maxLines = 1,
     TextInputType? keyboardType,
     String? Function(String?)? validator,
     void Function(String)? onChanged,
@@ -654,7 +645,6 @@ class _AdminScreenState extends State<AdminScreen> {
         TextFormField(
           controller: controller,
           maxLines: maxLines,
-          minLines: minLines,
           keyboardType: keyboardType,
           validator: validator,
           onChanged: onChanged,
