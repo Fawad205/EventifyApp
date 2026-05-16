@@ -96,20 +96,35 @@ class _TicketsScreenState extends State<TicketsScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             itemCount: ticketDocs.length,
             itemBuilder: (context, index) {
-              final data = ticketDocs[index].data() as Map<String, dynamic>;
-              final event = Event.fromMap(data).copyWith(id: ticketDocs[index].id);
+              final ticketId = ticketDocs[index].id;
+              final ticketData = ticketDocs[index].data() as Map<String, dynamic>;
               
-              return TicketCard(
-                event: event,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => DigitalTicketScreen(
-                        event: event,
-                        ticketId: 'TKT-${ticketDocs[index].id.substring(0, 5).toUpperCase()}',
-                      ),
-                    ),
+              // We use StreamBuilder to get real-time updates for this specific event
+              return StreamBuilder<DocumentSnapshot>(
+                stream: FirebaseFirestore.instance.collection('events').doc(ticketId).snapshots(),
+                builder: (context, eventSnapshot) {
+                  // If the main event exists, use its latest data. 
+                  // Otherwise, fall back to the cached data in the ticket.
+                  Event displayEvent;
+                  if (eventSnapshot.hasData && eventSnapshot.data!.exists) {
+                    displayEvent = Event.fromFirestore(eventSnapshot.data!);
+                  } else {
+                    displayEvent = Event.fromMap(ticketData).copyWith(id: ticketId);
+                  }
+
+                  return TicketCard(
+                    event: displayEvent,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => DigitalTicketScreen(
+                            event: displayEvent,
+                            ticketId: 'TKT-${ticketId.substring(0, 5).toUpperCase()}',
+                          ),
+                        ),
+                      );
+                    },
                   );
                 },
               );

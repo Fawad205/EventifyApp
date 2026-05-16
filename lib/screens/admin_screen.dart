@@ -18,7 +18,7 @@ class AdminScreen extends StatefulWidget {
   State<AdminScreen> createState() => _AdminScreenState();
 }
 
-class _AdminScreenState extends State<AdminScreen> {
+class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
 
   final _nameController = TextEditingController();
@@ -31,12 +31,13 @@ class _AdminScreenState extends State<AdminScreen> {
   final MapController _mapController = MapController();
   final loc.Location _locationService = loc.Location();
   final FirebaseAuth _auth = FirebaseAuth.instance;
-
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _selectedTime = const TimeOfDay(hour: 18, minute: 0);
   String _selectedCategory = 'Tech Events';
   LatLng? _selectedLocation;
   bool _isSaving = false;
+  String? _editingEventId;
+  late TabController _tabController;
 
   final List<String> _categories = [
     'Tech Events',
@@ -48,10 +49,12 @@ class _AdminScreenState extends State<AdminScreen> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
   }
 
   @override
   void dispose() {
+    _tabController.dispose();
     _nameController.dispose();
     _locationController.dispose();
     _descriptionController.dispose();
@@ -147,7 +150,7 @@ class _AdminScreenState extends State<AdminScreen> {
     }
   }
 
-  Future<void> _createEvent() async {
+  Future<void> _saveEvent() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isSaving = true);
       
@@ -187,8 +190,8 @@ class _AdminScreenState extends State<AdminScreen> {
           finalImageUrl = 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=800&q=80';
         }
 
-        final newEvent = Event(
-          id: '', 
+        final eventData = Event(
+          id: _editingEventId ?? '', 
           title: _nameController.text.isEmpty ? 'Untitled Event' : _nameController.text,
           description: _descriptionController.text,
           category: _selectedCategory,
@@ -199,20 +202,29 @@ class _AdminScreenState extends State<AdminScreen> {
           latitude: _selectedLocation?.latitude,
           longitude: _selectedLocation?.longitude,
           createdBy: _auth.currentUser?.uid ?? '',
-        );
-
-        await FirebaseFirestore.instance.collection('events').add(newEvent.toMap());
+        ).toMap();
+        
+        if (_editingEventId != null) {
+          await FirebaseFirestore.instance.collection('events').doc(_editingEventId).update(eventData);
+        } else {
+          await FirebaseFirestore.instance.collection('events').add(eventData);
+        }
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Event created successfully!')),
+            SnackBar(content: Text(_editingEventId != null ? 'Event updated successfully!' : 'Event created successfully!')),
           );
-          Navigator.pop(context);
+          if (_editingEventId != null) {
+            _clearForm();
+            _tabController.animateTo(1); // Switch back to manage tab
+          } else {
+            Navigator.pop(context);
+          }
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to create event: $e')),
+            SnackBar(content: Text('Failed to save event: $e')),
           );
         }
       } finally {
@@ -221,32 +233,69 @@ class _AdminScreenState extends State<AdminScreen> {
     }
   }
 
+  void _clearForm() {
+    setState(() {
+      _editingEventId = null;
+      _nameController.clear();
+      _locationController.clear();
+      _descriptionController.clear();
+      _priceController.clear();
+      _imageUrlController.clear();
+      _selectedImage = null;
+      _selectedDate = DateTime.now().add(const Duration(days: 1));
+      _selectedTime = const TimeOfDay(hour: 18, minute: 0);
+      _selectedCategory = 'Tech Events';
+      _selectedLocation = null;
+    });
+  }
+
+  void _editEvent(Event event) {
+    setState(() {
+      _editingEventId = event.id;
+      _nameController.text = event.title;
+      _locationController.text = event.location;
+      _descriptionController.text = event.description;
+      _priceController.text = event.price.toStringAsFixed(0);
+      _imageUrlController.text = event.imageUrl;
+      _selectedDate = event.date;
+      _selectedTime = TimeOfDay.fromDateTime(event.date);
+      _selectedCategory = event.category;
+      if (event.latitude != null && event.longitude != null) {
+        _selectedLocation = LatLng(event.latitude!, event.longitude!);
+        _mapController.move(_selectedLocation!, 15.0);
+      } else {
+        _selectedLocation = null;
+      }
+    });
+    _tabController.animateTo(0); // Switch to create/edit tab
+  }
+
   @override
   Widget build(BuildContext context) {
     const Color primaryPurple = Color(0xFF6342E8);
 
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text('Admin Dashboard', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.white,
-        appBar: AppBar(
-          title: const Text('Admin Dashboard', style: TextStyle(fontWeight: FontWeight.bold)),
-          backgroundColor: Colors.white,
-          foregroundColor: primaryPurple,
-          elevation: 0,
-          centerTitle: true,
-          bottom: const TabBar(
-            labelColor: primaryPurple,
-            unselectedLabelColor: Colors.black54,
-            indicatorColor: primaryPurple,
-            tabs: [
-              Tab(text: 'Create Event'),
-              Tab(text: 'Manage Events'),
-            ],
-          ),
+        foregroundColor: primaryPurple,
+        elevation: 0,
+        centerTitle: true,
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: primaryPurple,
+          unselectedLabelColor: Colors.black54,
+          indicatorColor: primaryPurple,
+          tabs: const [
+            Tab(text: 'Create Event'),
+            Tab(text: 'Manage Events'),
+          ],
         ),
-        body: TabBarView(
-          children: [
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
             // Tab 1: Create Event
             SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),
@@ -255,7 +304,21 @@ class _AdminScreenState extends State<AdminScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Create New Event', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _editingEventId != null ? 'Edit Event' : 'Create New Event', 
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
+                        ),
+                        if (_editingEventId != null)
+                          TextButton.icon(
+                            onPressed: _clearForm,
+                            icon: const Icon(Icons.close, size: 18),
+                            label: const Text('Cancel Edit'),
+                          ),
+                      ],
+                    ),
                     const SizedBox(height: 24),
                     
                     // Combined Image Picker & URL Field
@@ -476,7 +539,7 @@ class _AdminScreenState extends State<AdminScreen> {
                       width: double.infinity,
                       height: 56,
                       child: ElevatedButton(
-                        onPressed: _isSaving ? null : _createEvent,
+                        onPressed: _isSaving ? null : _saveEvent,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: primaryPurple,
                           shape: RoundedRectangleBorder(
@@ -485,12 +548,15 @@ class _AdminScreenState extends State<AdminScreen> {
                         ),
                         child: _isSaving 
                           ? const CircularProgressIndicator(color: Colors.white)
-                          : const Row(
+                          : Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text('Create Event', style: TextStyle(fontSize: 16, color: Colors.white)),
-                                SizedBox(width: 8),
-                                Icon(Icons.arrow_forward, color: Colors.white),
+                                Text(
+                                  _editingEventId != null ? 'Update Event' : 'Create Event', 
+                                  style: const TextStyle(fontSize: 16, color: Colors.white)
+                                ),
+                                const SizedBox(width: 8),
+                                const Icon(Icons.arrow_forward, color: Colors.white),
                               ],
                             ),
                       ),
@@ -503,8 +569,7 @@ class _AdminScreenState extends State<AdminScreen> {
             
             // Tab 2: Manage Events
             _buildManageEventsTab(primaryPurple),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -579,9 +644,18 @@ class _AdminScreenState extends State<AdminScreen> {
                       ),
                   ],
                 ),
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.red),
-                  onPressed: () => _confirmDelete(context, doc.id, event.title),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined, color: Colors.blue),
+                      onPressed: () => _editEvent(event),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, color: Colors.red),
+                      onPressed: () => _confirmDelete(context, doc.id, event.title),
+                    ),
+                  ],
                 ),
               ),
             );
