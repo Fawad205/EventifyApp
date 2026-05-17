@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import '../services/auth_service.dart';
 import '../services/favorites_service.dart';
 import '../services/tickets_service.dart';
-import '../services/map_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'auth/login_screen.dart';
 import 'tickets_screen.dart';
 
@@ -121,11 +121,12 @@ class EventDetailScreen extends StatelessWidget {
                   const SizedBox(height: 16),
                   InkWell(
                     onTap: () {
-                      if (event.latitude != null && event.longitude != null) {
-                        MapService.openMap(event.latitude!, event.longitude!);
+                      final url = Uri.tryParse(event.location);
+                      if (url != null && url.hasScheme) {
+                        launchUrl(url, mode: LaunchMode.externalApplication);
                       } else {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Precise location not available for this event.')),
+                          const SnackBar(content: Text('Location link is not available for this event.')),
                         );
                       }
                     },

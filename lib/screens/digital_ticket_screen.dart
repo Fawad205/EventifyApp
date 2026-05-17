@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../models/event_model.dart';
 import '../services/auth_service.dart';
-import '../services/map_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class DigitalTicketScreen extends StatelessWidget {
   final Event event;
@@ -128,8 +128,13 @@ class DigitalTicketScreen extends StatelessWidget {
                           const SizedBox(height: 4),
                           InkWell(
                             onTap: () {
-                              if (event.latitude != null && event.longitude != null) {
-                                MapService.openMap(event.latitude!, event.longitude!);
+                              final url = Uri.tryParse(event.location);
+                              if (url != null && url.hasScheme) {
+                                launchUrl(url, mode: LaunchMode.externalApplication);
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Location link is not available.')),
+                                );
                               }
                             },
                             child: Row(

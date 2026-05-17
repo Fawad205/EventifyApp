@@ -37,7 +37,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
     _tabController.addListener(_handleTabChange);
   }
 
@@ -96,8 +96,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       for (final e in events) {
         if (e.latitude != null && e.longitude != null) {
           final d = _distanceInKm(userLat, userLon, e.latitude!, e.longitude!);
-          // Increased radius to 500km to ensure events show up during testing
-          if (d <= 500.0) nearby.add(e);
+          // 20km radius as requested
+          if (d <= 20.0) nearby.add(e);
         }
       }
 
@@ -156,6 +156,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             Text('Tech Events', style: TextStyle(fontWeight: FontWeight.w600)),
             Text('Islamic Events', style: TextStyle(fontWeight: FontWeight.w600)),
             Text('Expo Events', style: TextStyle(fontWeight: FontWeight.w600)),
+            Text('Concert', style: TextStyle(fontWeight: FontWeight.w600)),
           ],
         ),
       ),
@@ -232,7 +233,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   if (nearby.isEmpty) {
                     return Center(
                       child: Text(
-                        'No events found within 500 km.', 
+                        'No events found within 20 km.', 
                         style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)
                       )
                     );
@@ -256,6 +257,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               _buildEventList(events.where((e) => e.category == 'Islamic Events').toList()),
               // Expo Events Tab
               _buildEventList(events.where((e) => e.category == 'Expo Events').toList()),
+              // Concert Tab
+              _buildEventList(events.where((e) => e.category == 'Concert').toList()),
             ],
           );
         },

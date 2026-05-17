@@ -1,15 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
 import 'dart:io';
-import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:location/location.dart' as loc;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/event_model.dart';
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -29,13 +26,10 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   final _imageUrlController = TextEditingController();
   File? _selectedImage;
   final ImagePicker _picker = ImagePicker();
-  final MapController _mapController = MapController();
-  final loc.Location _locationService = loc.Location();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _selectedTime = const TimeOfDay(hour: 18, minute: 0);
   String _selectedCategory = 'Tech Events';
-  LatLng? _selectedLocation;
   bool _isSaving = false;
   String? _editingEventId;
   late TabController _tabController;
@@ -75,54 +69,14 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
     }
   }
 
-  Future<void> _getCurrentLocation() async {
-    bool serviceEnabled;
-    loc.PermissionStatus permissionGranted;
-
-    serviceEnabled = await _locationService.serviceEnabled();
-    if (!serviceEnabled) {
-      serviceEnabled = await _locationService.requestService();
-      if (!serviceEnabled) return;
-    }
-
-    permissionGranted = await _locationService.hasPermission();
-    if (permissionGranted == loc.PermissionStatus.denied) {
-      permissionGranted = await _locationService.requestPermission();
-      if (permissionGranted != loc.PermissionStatus.granted) return;
-    }
-
-    final locationData = await _locationService.getLocation();
-    if (locationData.latitude != null && locationData.longitude != null) {
-      final point = LatLng(locationData.latitude!, locationData.longitude!);
-      _mapController.move(point, 15.0);
-      _updateLocation(point);
-    }
-  }
-
-  Future<void> _updateLocation(LatLng point) async {
-    setState(() {
-      _selectedLocation = point;
-      _locationController.text = "Loading address...";
-    });
-
-    try {
-      final response = await http.get(Uri.parse(
-          'https://nominatim.openstreetmap.org/reverse?format=json&lat=${point.latitude}&lon=${point.longitude}&zoom=18&addressdetails=1'));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final address = data['display_name'] ?? "${point.latitude}, ${point.longitude}";
-        setState(() {
-          _locationController.text = address;
-        });
-      } else {
-        setState(() {
-          _locationController.text = "${point.latitude.toStringAsFixed(4)}, ${point.longitude.toStringAsFixed(4)}";
-        });
+  Future<void> _openGoogleMaps() async {
+    final Uri url = Uri.parse('https://maps.google.com');
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open Google Maps')),
+        );
       }
-    } catch (e) {
-      setState(() {
-        _locationController.text = "${point.latitude.toStringAsFixed(4)}, ${point.longitude.toStringAsFixed(4)}";
-      });
     }
   }
 
@@ -192,6 +146,60 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
           finalImageUrl = 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=800&q=80';
         }
 
+        double? lat;
+        double? lng;
+        
+        try {
+          final urlStr = _locationController.text.trim();
+          if (urlStr.isNotEmpty) {
+            final urlRegExp = RegExp(r'(https?:\/\/[^\s]+)');
+            final match = urlRegExp.firstMatch(urlStr);
+            
+            if (match != null) {
+              String url = match.group(0)!;
+              String finalUrl = url;
+              String responseBody = "";
+              
+              // If it's a short link, expand it
+              if (url.contains('goo.gl') || url.contains('maps.app.goo.gl')) {
+                final response = await http.get(
+                  Uri.parse(url),
+                  headers: {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'},
+                );
+                finalUrl = response.request?.url.toString() ?? url;
+                responseBody = response.body;
+              }
+              
+              void extractCoords(String content) {
+                var regExp = RegExp(r'@(-?\d+\.\d+),(-?\d+\.\d+)');
+                var m = regExp.firstMatch(content);
+                if (m != null) { lat = double.tryParse(m.group(1)!); lng = double.tryParse(m.group(2)!); return; }
+                
+                regExp = RegExp(r'3d(-?\d+\.\d+)!4d(-?\d+\.\d+)');
+                m = regExp.firstMatch(content);
+                if (m != null) { lat = double.tryParse(m.group(1)!); lng = double.tryParse(m.group(2)!); return; }
+
+                regExp = RegExp(r'[ql]l?=(-?\d+\.\d+),(-?\d+\.\d+)');
+                m = regExp.firstMatch(content);
+                if (m != null) { lat = double.tryParse(m.group(1)!); lng = double.tryParse(m.group(2)!); return; }
+
+                regExp = RegExp(r'center=(-?\d+\.\d+)%2C(-?\d+\.\d+)');
+                m = regExp.firstMatch(content);
+                if (m != null) { lat = double.tryParse(m.group(1)!); lng = double.tryParse(m.group(2)!); return; }
+                
+                regExp = RegExp(r'center=(-?\d+\.\d+),(-?\d+\.\d+)');
+                m = regExp.firstMatch(content);
+                if (m != null) { lat = double.tryParse(m.group(1)!); lng = double.tryParse(m.group(2)!); return; }
+              }
+              
+              extractCoords(finalUrl);
+              if (lat == null || lng == null) extractCoords(responseBody);
+            }
+          }
+        } catch (e) {
+          debugPrint("Failed to extract coordinates: $e");
+        }
+
         final eventData = Event(
           id: _editingEventId ?? '', 
           title: _nameController.text.isEmpty ? 'Untitled Event' : _nameController.text,
@@ -202,8 +210,8 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
           venueName: _venueNameController.text.isEmpty ? 'Venue TBD' : _venueNameController.text,
           imageUrl: finalImageUrl, 
           price: price,
-          latitude: _selectedLocation?.latitude,
-          longitude: _selectedLocation?.longitude,
+          latitude: lat,
+          longitude: lng,
           createdBy: _auth.currentUser?.uid ?? '',
         ).toMap();
         
@@ -249,7 +257,6 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       _selectedDate = DateTime.now().add(const Duration(days: 1));
       _selectedTime = const TimeOfDay(hour: 18, minute: 0);
       _selectedCategory = 'Tech Events';
-      _selectedLocation = null;
     });
   }
 
@@ -265,12 +272,6 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       _selectedDate = event.date;
       _selectedTime = TimeOfDay.fromDateTime(event.date);
       _selectedCategory = event.category;
-      if (event.latitude != null && event.longitude != null) {
-        _selectedLocation = LatLng(event.latitude!, event.longitude!);
-        _mapController.move(_selectedLocation!, 15.0);
-      } else {
-        _selectedLocation = null;
-      }
     });
     _tabController.animateTo(0); // Switch to create/edit tab
   }
@@ -459,74 +460,58 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                     ),
                     const SizedBox(height: 16),
     
-                    // Location Map
-                    const Text('Pin Location on Map', style: TextStyle(fontSize: 14, color: Colors.black87)),
+                    // Location Integration
+                    const Text('Event Location', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     Container(
-                      height: 250,
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
+                        color: Colors.blue.shade50,
                         borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.blue.shade200),
                       ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Stack(
-                          children: [
-                            FlutterMap(
-                              mapController: _mapController,
-                              options: MapOptions(
-                                initialCenter: const LatLng(31.4187, 73.0791),
-                                initialZoom: 13.0,
-                                onTap: (tapPosition, point) => _updateLocation(point),
-                              ),
-                              children: [
-                                TileLayer(
-                                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                                  userAgentPackageName: 'com.example.eventify',
-                                ),
-                                if (_selectedLocation != null)
-                                  MarkerLayer(
-                                    markers: [
-                                      Marker(
-                                        point: _selectedLocation!,
-                                        width: 40,
-                                        height: 40,
-                                        child: const Icon(Icons.location_on, color: Colors.red, size: 40),
-                                      ),
-                                    ],
-                                  ),
-                              ],
-                            ),
-                            Positioned(
-                              right: 16,
-                              bottom: 16,
-                              child: FloatingActionButton.small(
-                                onPressed: _getCurrentLocation,
-                                backgroundColor: primaryPurple,
-                                child: const Icon(Icons.my_location, color: Colors.white),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            '1. Tap the button below to open Google Maps.\n2. Find your exact location and tap "Share".\n3. Copy the link and paste it in the field below.',
+                            style: TextStyle(fontSize: 13, color: Colors.blue, height: 1.5),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: _openGoogleMaps,
+                              icon: const Icon(Icons.map),
+                              label: const Text('Open Google Maps'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 16),
-    
-                    // Venue Name (Manual)
+                    
+                    // Map Link
                     _buildTextField(
-                      label: 'Venue / Building Name (Manual)',
-                      hint: 'e.g. Grand Hall, Marriott Hotel',
-                      controller: _venueNameController,
-                    ),
-                    const SizedBox(height: 16),
-    
-                    // Map Address (Auto-filled)
-                    _buildTextField(
-                      label: 'Exact Map Address (Auto-filled)',
-                      hint: 'Tap on map to pin address...',
+                      label: 'Google Maps Link',
+                      hint: 'Paste link here (e.g., https://maps.app.goo.gl/...)',
                       controller: _locationController,
-                      maxLines: 3, // Allow wrapping
-                      validator: (value) => value == null || value.isEmpty ? 'Please select a location on the map' : null,
+                      validator: (value) => value == null || value.isEmpty ? 'Please paste the location link' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    
+                    // Venue Name
+                    _buildTextField(
+                      label: 'Venue / Building Name',
+                      hint: 'e.g., Grand Hall, Marriott Hotel',
+                      controller: _venueNameController,
+                      validator: (value) => value == null || value.isEmpty ? 'Please enter the venue name' : null,
                     ),
                     const SizedBox(height: 16),
     
